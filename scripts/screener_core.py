@@ -23,7 +23,8 @@ from typing import Any
 
 import pandas as pd
 
-from config import get_token
+from config import get_api_url, get_token, resolve_runtime_token
+from data_provider import DataProviderRouter
 from screener_config import ScreenerConfig
 
 # Lazy import to avoid circular dependency at module level
@@ -163,7 +164,8 @@ class TushareScreener:
 
     def __init__(self, token: str | None = None, config: ScreenerConfig | None = None):
         self.config = config or ScreenerConfig()
-        self._token = token or get_token()
+        self._provider = DataProviderRouter()
+        self._token = resolve_runtime_token(token, self._provider.name)
         self._pro = None  # lazy init
         self.cache = ScreenerCache(self.config.cache_dir)
         self._rf_cache: float | None = None  # global risk-free rate
@@ -175,13 +177,16 @@ class TushareScreener:
             import tushare as ts
             ts.set_token(self._token)
             self._pro = ts.pro_api(timeout=30)
-            api_url = os.environ.get("TUSHARE_API_URL", "")
+            api_url = get_api_url() or ""
             if api_url:
                 self._pro._DataApi__http_url = api_url
         return self._pro
 
     def _safe_call(self, api_name: str, **kwargs) -> pd.DataFrame:
         """Call Tushare API with retry (mirrors TushareClient._safe_call)."""
+        if self._provider.use_akshare():
+            return self._provider.direct_fetch(api_name, **kwargs)
+
         pro = self._get_pro()
         last_err = None
         for attempt in range(1, 4):
@@ -190,11 +195,14 @@ class TushareScreener:
                 api_func = getattr(pro, api_name)
                 return api_func(**kwargs)
             except Exception as e:
+                fallback_df = self._provider.fallback_fetch(e, api_name, **kwargs)
+                if fallback_df is not None:
+                    return fallback_df
                 last_err = e
                 if attempt < 3:
                     import tushare as ts
                     self._pro = ts.pro_api(timeout=30)
-                    api_url = os.environ.get("TUSHARE_API_URL", "")
+                    api_url = get_api_url() or ""
                     if api_url:
                         self._pro._DataApi__http_url = api_url
                     time.sleep(1.0 * attempt)
@@ -372,7 +380,10 @@ class TushareScreener:
         obs_df = df[obs_mask].copy()
 
         # 7. Dividend yield > 0 — main channel only
-        main_df = main_df[main_df["dv_ttm"].notna() & (main_df["dv_ttm"] > 0)].copy()
+        if "dv_ttm" in main_df.columns and main_df["dv_ttm"].notna().any():
+            main_df = main_df[main_df["dv_ttm"].notna() & (main_df["dv_ttm"] > 0)].copy()
+        else:
+            main_df["dv_ttm"] = main_df.get("dv_ttm", pd.Series(index=main_df.index, dtype="float64")).fillna(0.0)
         main_df["channel"] = "main"
 
         # 8. Observation channel: top N by market cap (no dividend requirement)

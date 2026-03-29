@@ -28,7 +28,8 @@ try:
 except ImportError:
     _yf_available = False
 
-from config import get_token, get_api_url, validate_stock_code
+from config import get_api_url, validate_stock_code, get_data_provider, resolve_runtime_token
+from data_provider import DataProviderRouter
 from format_utils import format_number, format_table, format_header
 
 # Re-export all constants and mixin classes for backward compatibility.
@@ -85,6 +86,7 @@ class TushareClient(
         if api_url:
             self.pro._DataApi__token = token
             self.pro._DataApi__http_url = api_url
+        self._provider = DataProviderRouter(get_data_provider())
 
     @rate_limit
     def _safe_call(self, api_name: str, **kwargs) -> pd.DataFrame:
@@ -102,6 +104,9 @@ class TushareClient(
         Raises:
             RuntimeError: After MAX_RETRIES failures.
         """
+        if self._provider.use_akshare():
+            return self._provider.direct_fetch(api_name, **kwargs)
+
         # Auto-upgrade to VIP endpoint when broker is active
         effective_name = api_name
         if self._vip_mode and api_name in _VIP_MAP:
@@ -114,6 +119,9 @@ class TushareClient(
                 df = api_func(**kwargs)
                 return df
             except Exception as e:
+                fallback_df = self._provider.fallback_fetch(e, api_name, **kwargs)
+                if fallback_df is not None:
+                    return fallback_df
                 last_err = e
                 if attempt < self.MAX_RETRIES:
                     is_conn_err = isinstance(e, (ConnectionError, OSError)) or \
@@ -244,7 +252,8 @@ def main():
         return
 
     # Get token
-    token = args.token or get_token()
+    provider = get_data_provider()
+    token = resolve_runtime_token(args.token, provider)
     client = TushareClient(token)
 
     if args.refresh_market:
@@ -290,7 +299,6 @@ def main():
         data_pack += "\n".join(extra_lines)
 
     # Write output
-    import os
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(data_pack)

@@ -4,7 +4,14 @@ import os
 
 import pytest
 
-from config import get_token, validate_stock_code, check_local_pdf, validate_pdf
+from config import (
+    get_token,
+    get_data_provider,
+    resolve_runtime_token,
+    validate_stock_code,
+    check_local_pdf,
+    validate_pdf,
+)
 
 
 # --- get_token() ---
@@ -60,6 +67,33 @@ class TestGetToken:
         monkeypatch.setattr(config_mod, "__file__", str(scripts_dir / "config.py"))
         assert get_token() == "valid_token"
         monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+
+
+class TestDataProvider:
+    def test_default_is_tushare(self, monkeypatch):
+        monkeypatch.delenv("DATA_PROVIDER", raising=False)
+        assert get_data_provider() == "tushare"
+
+    def test_akshare_provider(self, monkeypatch):
+        monkeypatch.setenv("DATA_PROVIDER", "akshare")
+        assert get_data_provider() == "akshare"
+
+    def test_invalid_provider(self, monkeypatch):
+        monkeypatch.setenv("DATA_PROVIDER", "foo")
+        with pytest.raises(RuntimeError, match="Unsupported DATA_PROVIDER"):
+            get_data_provider()
+
+    def test_resolve_runtime_token_tushare(self, monkeypatch):
+        monkeypatch.setenv("TUSHARE_TOKEN", "abc123")
+        assert resolve_runtime_token(None, "tushare") == "abc123"
+
+    def test_resolve_runtime_token_akshare_placeholder(self, monkeypatch):
+        monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+        assert resolve_runtime_token(None, "akshare") == "akshare"
+
+    def test_resolve_runtime_token_prefers_explicit(self, monkeypatch):
+        monkeypatch.setenv("TUSHARE_TOKEN", "from_env")
+        assert resolve_runtime_token("from_arg", "tushare") == "from_arg"
 
 
 # --- validate_stock_code() ---

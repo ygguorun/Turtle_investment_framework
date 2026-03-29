@@ -88,7 +88,9 @@ v2.0 采用 **共享模块 + 策略专属模块** 的分层架构，定性分析
 ### 环境要求
 
 - Python >= 3.10
+- [uv](https://docs.astral.sh/uv/)（用于 Python 环境与依赖管理）
 - [Tushare Pro](https://tushare.pro/) 账号及 API Token
+- [AkShare](https://akshare.akfamily.xyz/)（可选：用于替代 Tushare 权限受限接口）
 - （可选）pdfplumber 用于 PDF 解析
 - （内置）`/download-report` 命令用于自动下载年报
 
@@ -100,7 +102,10 @@ v2.0 采用 **共享模块 + 策略专属模块** 的分层架构，定性分析
 git clone https://github.com/terancejiang/Turtle_investment_framework.git
 cd Turtle_investment_framework
 
-# 一键初始化（创建 venv、安装依赖、验证环境）
+# 推荐：使用 uv 同步环境
+uv sync
+
+# 或一键初始化（使用 uv 创建 .venv、安装依赖、验证环境）
 bash init.sh
 ```
 
@@ -110,13 +115,16 @@ bash init.sh
 cd Turtle_investment_framework
 git pull
 
-# 重新安装依赖（确保新增的包被安装）
+# 使用 uv 同步依赖
+uv sync
+
+# 或重新安装依赖（确保新增的包被安装）
 bash init.sh --force-install
 ```
 
 `init.sh` 会自动完成：
-1. 查找系统中 Python >= 3.10，创建 `.venv`
-2. 安装 `requirements.txt` 中的依赖
+1. 使用 uv 创建 `.venv`（Python >= 3.10）
+2. 使用 uv 同步 `requirements.txt` 依赖
 3. 检查 `TUSHARE_TOKEN` 环境变量
 4. 运行测试验证环境
 
@@ -133,6 +141,27 @@ cp .env.sample .env
 ```bash
 export TUSHARE_TOKEN='your_token_here'
 ```
+
+### 使用 AkShare 作为数据提供方（可选）
+
+当 Tushare 接口权限不足时，可切换到 AkShare：
+
+```bash
+export DATA_PROVIDER=akshare
+```
+
+随后正常执行命令即可，例如：
+
+```bash
+uv run python scripts/tushare_collector.py --code 600887.SH --output output/data_pack_market.md
+uv run python scripts/screener_core.py --tier1-only
+```
+
+说明：
+- `DATA_PROVIDER` 支持 `tushare` / `akshare`（默认 `tushare`）；
+- `DATA_PROVIDER=akshare` 时会优先使用 AkShare 映射接口；
+- 默认不设置该变量时，仍使用 Tushare；
+- 若使用 Tushare 且遇到权限报错，脚本会自动尝试 AkShare 回退（A 股主流程接口）。
 
 ## 使用方法
 
@@ -534,6 +563,7 @@ tqdm>=4.60.0          # 进度条
 jupyter>=1.0.0        # Notebook 运行环境
 jinja2>=3.0.0         # HTML 模板（报告 + 选股器导出）
 yfinance>=0.2.0       # 港股/美股行情回退
+akshare>=1.18.0       # 开源财经接口（A股替代）
 ```
 
 ## License

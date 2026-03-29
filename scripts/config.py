@@ -58,6 +58,40 @@ def get_api_url() -> Optional[str]:
     return os.environ.get("TUSHARE_API_URL") or None
 
 
+def get_data_provider() -> str:
+    """Return normalized data provider name.
+
+    Supported values:
+      - "tushare" (default)
+      - "akshare"
+    """
+    _load_env_file()
+    provider = os.environ.get("DATA_PROVIDER", "tushare").strip().lower()
+    if provider not in {"tushare", "akshare"}:
+        raise RuntimeError(
+            f"Unsupported DATA_PROVIDER: {provider}. "
+            "Use 'tushare' or 'akshare'."
+        )
+    return provider
+
+
+def resolve_runtime_token(explicit_token: Optional[str] = None,
+                          provider: Optional[str] = None) -> str:
+    """Resolve runtime token based on provider mode.
+
+    - For tushare: require a real TUSHARE_TOKEN.
+    - For akshare: token is ignored, keep compatibility with a placeholder.
+    """
+    if explicit_token:
+        return explicit_token
+
+    mode = provider or get_data_provider()
+    if mode == "akshare":
+        _load_env_file()
+        return os.environ.get("TUSHARE_TOKEN", "akshare")
+    return get_token()
+
+
 def validate_stock_code(code: str) -> str:
     """Validate and normalize a stock code to Tushare format.
 

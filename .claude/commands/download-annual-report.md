@@ -100,7 +100,7 @@ Tell the user that no matching report was found and suggest they verify the stoc
 Once you have identified the correct PDF URL, run the download script:
 
 ```bash
-python3 scripts/download_report.py \
+uv run python scripts/download_report.py \
   --url "<PDF_URL>" \
   --stock-code "<formatted_stock_code>" \
   --report-type "<report_type>" \

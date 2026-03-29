@@ -20,6 +20,8 @@ python3 scripts/tushare_collector.py --code $ARGUMENTS --output output/{code}_{c
 ```
 - Refreshes §1 (price/market cap), §2 (52-week range), §11 (weekly prices), §14 (risk-free rate)
 - If data pack is >7 days old, auto-falls back to full collection
+- Data provider is controlled by `DATA_PROVIDER` (`tushare` default, `akshare` optional)
+- In `tushare` mode, A-share permission errors on supported endpoints auto-fallback to AkShare
 
 ### Phase 3: Analysis and Report
 - **Step 3.0**: Read strategies/turtle/phase3_preflight.md for data validation
