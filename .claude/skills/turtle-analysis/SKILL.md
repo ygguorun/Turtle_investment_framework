@@ -1,3 +1,8 @@
+---
+name: turtle-analysis
+description: Run a full 龟龟投资策略 (Turtle Investment Framework) multi-phase fundamental analysis on Chinese A-share or HK stocks
+---
+
 # Turtle Investment Framework — Skill Definition
 
 ## Skill Info
